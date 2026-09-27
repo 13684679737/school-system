@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家长 · 孩子校园</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:"Microsoft YaHei","PingFang SC",sans-serif; }
+  body { background:#f0fdf4; }
+  .head { background:linear-gradient(90deg,#16a34a,#4ade80); color:#fff; padding:20px 34px; display:flex; justify-content:space-between; align-items:center; }
+  .head h1 { font-size:20px; }
+  .logout { background:rgba(255,255,258,.25); color:#fff; border:none; padding:8px 16px; border-radius:20px; cursor:pointer; }
+  .child { max-width:1000px; margin:18px auto 0; background:#fff; border-radius:12px; padding:14px 20px; color:#15803d; font-size:15px; box-shadow:0 2px 8px rgba(22,163,74,.1); }
+  .wrap { max-width:1000px; margin:16px auto; display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:0 16px; }
+  .card { background:#fff; border-radius:12px; padding:20px; box-shadow:0 2px 8px rgba(22,163,74,.1); }
+  .card h3 { color:#15803d; margin-bottom:12px; font-size:16px; }
+  .row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px dashed #bbf7d0; font-size:14px; }
+  .tag { padding:2px 9px; border-radius:10px; font-size:12px; }
+  .paid { background:#dcfce7; color:#16a34a; }
+  .unpaid { background:#fee2e2; color:#dc2626; }
+  .noti { padding:8px 0; border-bottom:1px dashed #bbf7d0; font-size:14px; }
+  .noti b { color:#14532d; }
+  .full { grid-column:1 / -1; }
+  input,textarea { width:100%; padding:8px 10px; border:1px solid #bbf7d0; border-radius:8px; margin-bottom:8px; }
+  .btn { background:#16a34a; color:#fff; border:none; padding:9px 18px; border-radius:20px; cursor:pointer; }
+  .lv-tag { padding:2px 9px; border-radius:10px; font-size:12px; }
+  .orange { background:#ffedd5; color:#ea580c; }
+  .green { background:#dcfce7; color:#16a34a; }
+  .red { background:#fee2e2; color:#dc2626; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <div><h1>家长中心</h1><div style="opacity:.9;font-size:14px" id="who"></div></div>
+    <button class="logout" onclick="logout()">退出</button>
+  </div>
+  <div class="child" id="childInfo"></div>
+  <div class="wrap">
+    <div class="card">
+      <h3>孩子成绩</h3><div id="grades"></div>
+    </div>
+    <div class="card">
+      <h3>孩子考勤</h3><div id="attendance"></div>
+    </div>
+    <div class="card">
+      <h3>孩子课表</h3><div id="schedule"></div>
+    </div>
+    <div class="card">
+      <h3>缴费记录</h3><div id="fees"></div>
+    </div>
+    <div class="card full">
+      <h3>替孩子请假</h3>
+      <input id="lReason" placeholder="请假原因">
+      <button class="btn" onclick="postLeave()">提交请假申请</button>
+    </div>
+    <div class="card full">
+      <h3>孩子请假记录</h3>
+      <table id="leaveTable" style="width:100%;border-collapse:collapse;font-size:14px"></table>
+    </div>
+    <div class="card full">
+      <h3>学校通知</h3><div id="notices"></div>
+    </div>
+    <div class="card full">
+      <h3>修改密码</h3>
+      <div style="display:flex;gap:10px">
+        <input id="oldPwd" type="password" placeholder="原密码">
+        <input id="newPwd" type="password" placeholder="新密码">
+        <button class="btn" onclick="changePwd()">修改</button>
+      </div>
+    </div>
+  </div>
+<script>
+  const token = localStorage.getItem('token');
+  if (!token || localStorage.getItem('role') !== 'parent') location.href = 'login.html';
+  const api = (p,opt={}) => fetch(p,{...opt,headers:{...(opt.headers||{}),'Authorization':'Bearer '+token}}).then(r=>r.json());
+
+  async function load(){
+    who.textContent = '家长：' + localStorage.getItem('name');
+    const data = await api('/api/parent/me');
+    if(!data.child){ childInfo.textContent='暂未关联孩子，请联系管理员'; }
+    else { childInfo.textContent = '我的孩子：' + data.child.name + '（学号 ' + (data.child.studentNo||'-') + '）'; }
+
+    grades.innerHTML = data.grades.map(g=>`<div class="row"><span>${g.subject}</span><b style="color:#16a34a">${g.score}分</b></div>`).join('') || '暂无';
+    attendance.innerHTML = data.attendance.map(a=>`<div class="row"><span>${a.date}</span><span>${a.status}</span></div>`).join('') || '暂无';
+    schedule.innerHTML = data.schedule.map(s=>`<div class="row"><span>${s.day} 第${s.period}节</span><span>${s.subject}（${s.teacher}）</span></div>`).join('') || '暂无课表';
+    fees.innerHTML = data.fees.map(f=>`<div class="row"><span>${f.item} · ¥${f.amount}</span><span class="tag ${f.paid?'paid':'unpaid'}">${f.paid?'已缴':'待缴'}</span></div>`).join('') || '暂无';
+
+    leaveTable.innerHTML = '<tr><th>原因</th><th>提交人</th><th>状态</th></tr>' +
+      (data.leaves||[]).map(l=>`<tr><td>${l.reason||'-'}</td><td>${l.from==='家长'?'家长':'学生本人'}</td>
+        <td><span class="lv-tag ${l.status==='待审批'?'orange':l.status==='批准'?'green':'red'}">${l.status}</span></td></tr>`).join('')
+        || '<tr><td colspan=3>暂无请假记录</td></tr>';
+
+    notices.innerHTML = data.notices.map(n=>`<div class="noti"><b>${n.title}</b>（${n.date}）<br><span style="color:#666">${n.content}</span></div>`).join('') || '暂无通知';
+  }
+  async function postLeave(){
+    if(!lReason.value){alert('请填写请假原因');return;}
+    await api('/api/parent/leave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:lReason.value})});
+    lReason.value=''; alert('请假申请已提交，待老师审批'); load();
+  }
+  async function changePwd(){
+    const r = await fetch('/api/change-password',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({oldPassword:oldPwd.value,newPassword:newPwd.value})});
+    const d = await r.json();
+    if(!r.ok){alert(d.error);return;}
+    oldPwd.value='';newPwd.value=''; alert('密码修改成功');
+  }
+  async function logout(){
+    await fetch('/api/logout',{method:'POST',headers:{'Authorization':'Bearer '+token}});
+    localStorage.clear(); location.href='login.html';
+  }
+  load();
+  setInterval(load, 10000);
+</script>
+</body>
+</html>

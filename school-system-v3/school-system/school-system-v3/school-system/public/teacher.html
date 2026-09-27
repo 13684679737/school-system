@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>教师 · 工作台</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:"Microsoft YaHei","PingFang SC",sans-serif; }
+  body { background:#eff6ff; }
+  .banner { background:linear-gradient(90deg,#3b82f6,#60a5fa); color:#fff; padding:20px 34px; display:flex; justify-content:space-between; align-items:center; }
+  .banner h1 { font-size:20px; }
+  .banner .who { font-size:14px; opacity:.9; margin-top:3px; }
+  .logout { background:rgba(255,255,255,.25); color:#fff; border:none; padding:8px 16px; border-radius:20px; cursor:pointer; }
+  .wrap { max-width:1000px; margin:22px auto; display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:0 16px; }
+  .box { background:#fff; border-radius:12px; padding:20px; box-shadow:0 2px 8px rgba(59,130,246,.08); }
+  .box h3 { color:#1d4ed8; margin-bottom:13px; font-size:16px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th,td { padding:7px 8px; text-align:left; border-bottom:1px solid #e2e8f0; }
+  th { color:#475569; }
+  input,select,textarea { width:100%; padding:8px 10px; border:1px solid #bfdbfe; border-radius:6px; margin-bottom:9px; font-size:14px; }
+  .btn { background:#2563eb; color:#fff; border:none; padding:9px 18px; border-radius:6px; cursor:pointer; }
+  .btn-sm { padding:4px 11px; font-size:13px; border-radius:5px; }
+  .btn-green { background:#16a34a; }
+  .btn-red { background:#ef4444; }
+  .full { grid-column:1 / -1; }
+  .tag { padding:2px 8px; border-radius:10px; font-size:12px; }
+  .orange { background:#ffedd5; color:#ea580c; }
+  .green { background:#dcfce7; color:#16a34a; }
+  .red { background:#fee2e2; color:#dc2626; }
+</style>
+</head>
+<body>
+  <div class="banner">
+    <div><h1>教师工作台</h1><div class="who" id="who"></div></div>
+    <button class="logout" onclick="logout()">退出</button>
+  </div>
+  <div class="wrap">
+    <div class="box">
+      <h3>我的班级 / 学生名单</h3>
+      <div id="myClass" style="font-size:14px;color:#555;margin-bottom:10px"></div>
+      <table id="stuTable"></table>
+    </div>
+    <div class="box">
+      <h3>录入成绩</h3>
+      <select id="gStudent"></select>
+      <input id="gSubject" placeholder="科目，如 数学">
+      <input id="gScore" type="number" placeholder="分数">
+      <button class="btn" onclick="postGrade()">提交成绩</button>
+      <h3 style="margin-top:16px">记录考勤</h3>
+      <select id="aStudent"></select>
+      <select id="aStatus"><option>出勤</option><option>迟到</option><option>请假</option><option>旷课</option></select>
+      <button class="btn" onclick="postAttendance()">提交考勤</button>
+    </div>
+    <div class="box full">
+      <h3>已录成绩</h3>
+      <table id="gradeTable"></table>
+    </div>
+    <div class="box full">
+      <h3>学生请假审批</h3>
+      <table id="leaveTable"></table>
+    </div>
+    <div class="box">
+      <h3>发布班级通知</h3>
+      <input id="nTitle" placeholder="通知标题">
+      <textarea id="nContent" rows="2" placeholder="给本班家长发消息..."></textarea>
+      <button class="btn" onclick="postNotice()">发布</button>
+    </div>
+    <div class="box">
+      <h3>我发的通知</h3>
+      <div id="myNotices"></div>
+    </div>
+    <div class="box full">
+      <h3>修改密码</h3>
+      <div style="display:flex;gap:10px">
+        <input id="oldPwd" type="password" placeholder="原密码">
+        <input id="newPwd" type="password" placeholder="新密码">
+        <button class="btn" onclick="changePwd()">修改</button>
+      </div>
+    </div>
+  </div>
+<script>
+  const token = localStorage.getItem('token');
+  if (!token || localStorage.getItem('role') !== 'teacher') location.href = 'login.html';
+  const api = (p,opt={}) => fetch(p,{...opt,headers:{...(opt.headers||{}),'Authorization':'Bearer '+token}}).then(r=>r.json());
+  let students = [];
+
+  async function load(){
+    who.textContent = localStorage.getItem('name') + ' 老师';
+    const data = await api('/api/teacher/students');
+    students = data.students;
+    myClass.textContent = '任教班级：' + (data.class ? data.class.name : '暂未分配班级');
+    const clsName = id => (data.class && data.class.id===id) ? data.class.name : '-';
+
+    stuTable.innerHTML = '<tr><th>学号</th><th>姓名</th><th>性别</th></tr>' +
+      students.map(s=>`<tr><td>${s.studentNo||'-'}</td><td>${s.name}</td><td>${s.gender||'-'}</td></tr>`).join('') || '<tr><td colspan=3>暂无学生</td></tr>';
+
+    [gStudent,aStudent].forEach(sel=>{
+      sel.innerHTML = students.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+    });
+
+    const grades = await api('/api/teacher/grades');
+    const sName = id => students.find(s=>s.id===id)?.name || id;
+    gradeTable.innerHTML = '<tr><th>学生</th><th>科目</th><th>分数</th><th>操作</th></tr>' +
+      grades.map(g=>`<tr><td>${sName(g.studentId)}</td><td>${g.subject}</td><td>${g.score}</td>
+        <td><button class="btn-sm btn-red" style="border:none;cursor:pointer" onclick="delGrade('${g.id}')">删除</button></td></tr>`).join('')
+        || '<tr><td colspan=4>暂无成绩</td></tr>';
+
+    const leaves = await api('/api/teacher/leaves');
+    leaveTable.innerHTML = '<tr><th>学生</th><th>原因</th><th>提交人</th><th>状态</th><th>操作</th></tr>' +
+      leaves.map(l=>`<tr><td>${l.studentName}</td><td>${l.reason||'-'}</td><td>${l.from==='家长'?'家长':'学生'}</td>
+        <td><span class="tag ${l.status==='待审批'?'orange':l.status==='批准'?'green':'red'}">${l.status}</span></td>
+        <td>${l.status==='待审批'?
+          `<button class="btn-sm btn-green" style="border:none;cursor:pointer" onclick="review('${l.id}','批准')">批准</button>
+           <button class="btn-sm btn-red" style="border:none;cursor:pointer" onclick="review('${l.id}','拒绝')">拒绝</button>`:'-'}</td></tr>`).join('')
+        || '<tr><td colspan=5>暂无请假</td></tr>';
+
+    const allNotices = await api('/api/notices').catch(()=>[]);
+    const mine = allNotices.filter(n=>n.teacherId);
+    myNotices.innerHTML = mine.map(n=>`<div style="padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:8px;font-size:13px">
+      <b>${n.title}</b>（${n.date}）<div style="color:#666;margin:3px 0">${n.content}</div>
+      <button class="btn-sm btn-red" style="border:none;cursor:pointer" onclick="delNotice('${n.id}')">删除</button></div>`).join('') || '暂无';
+  }
+
+  async function postGrade(){
+    if(!gSubject.value||!gScore.value){alert('请填科目和分数');return;}
+    await api('/api/teacher/grades',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({studentId:gStudent.value,subject:gSubject.value,score:+gScore.value})});
+    gSubject.value='';gScore.value=''; alert('成绩已提交'); load();
+  }
+  async function delGrade(id){ if(confirm('确定删除该成绩？')){ await api('/api/teacher/grades/'+id,{method:'DELETE'}); load(); } }
+  async function postAttendance(){
+    await api('/api/teacher/attendance',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({studentId:aStudent.value,status:aStatus.value})});
+    alert('考勤已记录'); load();
+  }
+  async function review(id,status){ await api('/api/teacher/leaves/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})}); load(); }
+  async function postNotice(){
+    if(!nTitle.value||!nContent.value){alert('请填标题和内容');return;}
+    await api('/api/teacher/notices',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({title:nTitle.value,content:nContent.value})});
+    nTitle.value='';nContent.value=''; alert('已发布到本班'); load();
+  }
+  async function delNotice(id){ if(confirm('确定删除？')){ await api('/api/teacher/notices/'+id,{method:'DELETE'}); load(); } }
+  async function changePwd(){
+    const r = await fetch('/api/change-password',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({oldPassword:oldPwd.value,newPassword:newPwd.value})});
+    const d = await r.json();
+    if(!r.ok){alert(d.error);return;}
+    oldPwd.value='';newPwd.value=''; alert('密码修改成功');
+  }
+  async function logout(){
+    await fetch('/api/logout',{method:'POST',headers:{'Authorization':'Bearer '+token}});
+    localStorage.clear(); location.href='login.html';
+  }
+  load();
+  setInterval(load, 10000);
+</script>
+</body>
+</html>
