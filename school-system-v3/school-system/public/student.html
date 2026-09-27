@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>学生 · 我的校园</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:"Microsoft YaHei","PingFang SC",sans-serif; }
+  body { background:linear-gradient(180deg,#fff7ed,#fffbeb); min-height:100vh; }
+  .head { background:linear-gradient(90deg,#fb923c,#fbbf24); color:#fff; padding:22px 34px; display:flex; justify-content:space-between; align-items:center; }
+  .head h1 { font-size:20px; }
+  .logout { background:rgba(255,255,255,.25); color:#fff; border:none; padding:8px 16px; border-radius:20px; cursor:pointer; }
+  .wrap { max-width:1000px; margin:22px auto; display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:0 16px; }
+  .card { background:#fff; border-radius:16px; padding:20px; box-shadow:0 4px 14px rgba(251,146,60,.12); }
+  .card h3 { color:#ea580c; margin-bottom:12px; font-size:16px; }
+  .grade-item { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px dashed #fde68a; font-size:14px; }
+  .grade-item b { color:#ea580c; }
+  .schedule-item { padding:6px 0; font-size:14px; color:#444; }
+  .noti { padding:8px 0; border-bottom:1px dashed #fde68a; font-size:14px; }
+  .noti b { color:#92400e; }
+  input,textarea { width:100%; padding:8px 10px; border:1px solid #fed7aa; border-radius:8px; margin-bottom:8px; }
+  .btn { background:#f97316; color:#fff; border:none; padding:9px 18px; border-radius:20px; cursor:pointer; }
+  .btn-sm { padding:4px 11px; font-size:13px; border-radius:14px; }
+  .btn-red { background:#ef4444; }
+  .full { grid-column:1 / -1; }
+  .tag { padding:2px 9px; border-radius:10px; font-size:12px; }
+  .orange { background:#ffedd5; color:#ea580c; }
+  .green { background:#dcfce7; color:#16a34a; }
+  .red { background:#fee2e2; color:#dc2626; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <div><h1>我的校园</h1><div style="opacity:.9;font-size:14px" id="who"></div></div>
+    <button class="logout" onclick="logout()">退出</button>
+  </div>
+  <div class="wrap">
+    <div class="card">
+      <h3>我的成绩</h3><div id="grades"></div>
+    </div>
+    <div class="card">
+      <h3>我的课表</h3><div id="schedule"></div>
+    </div>
+    <div class="card">
+      <h3>我的考勤</h3><div id="attendance"></div>
+    </div>
+    <div class="card">
+      <h3>校园通知</h3><div id="notices"></div>
+    </div>
+    <div class="card full">
+      <h3>我要请假</h3>
+      <input id="lReason" placeholder="请假原因">
+      <button class="btn" onclick="postLeave()">提交请假申请</button>
+    </div>
+    <div class="card full">
+      <h3>我的请假记录</h3>
+      <table id="leaveTable" style="width:100%;border-collapse:collapse;font-size:14px"></table>
+    </div>
+    <div class="card full">
+      <h3>修改密码</h3>
+      <div style="display:flex;gap:10px">
+        <input id="oldPwd" type="password" placeholder="原密码">
+        <input id="newPwd" type="password" placeholder="新密码">
+        <button class="btn" onclick="changePwd()">修改</button>
+      </div>
+    </div>
+  </div>
+<script>
+  const token = localStorage.getItem('token');
+  if (!token || localStorage.getItem('role') !== 'student') location.href = 'login.html';
+  const api = (p,opt={}) => fetch(p,{...opt,headers:{...(opt.headers||{}),'Authorization':'Bearer '+token}}).then(r=>r.json());
+
+  async function load(){
+    who.textContent = '同学：' + localStorage.getItem('name');
+    const data = await api('/api/student/me');
+    grades.innerHTML = data.grades.map(g=>`<div class="grade-item"><span>${g.subject}</span><b>${g.score}分</b></div>`).join('') || '暂无成绩';
+    schedule.innerHTML = data.schedule.map(s=>`<div class="schedule-item">${s.day} 第${s.period}节 · ${s.subject}（${s.teacher}）</div>`).join('') || '暂无课表';
+    attendance.innerHTML = data.attendance.map(a=>`<div class="schedule-item">${a.date} · ${a.status}</div>`).join('') || '暂无考勤';
+    notices.innerHTML = data.notices.map(n=>`<div class="noti"><b>${n.title}</b>（${n.date}）<br><span style="color:#666">${n.content}</span></div>`).join('') || '暂无通知';
+
+    leaveTable.innerHTML = '<tr><th>原因</th><th>提交人</th><th>状态</th><th>操作</th></tr>' +
+      (data.leaves||[]).map(l=>`<tr><td>${l.reason||'-'}</td><td>${l.from==='家长'?'家长':'本人'}</td>
+        <td><span class="tag ${l.status==='待审批'?'orange':l.status==='批准'?'green':'red'}">${l.status}</span></td>
+        <td>${l.status==='待审批'?`<button class="btn btn-sm btn-red" onclick="cancelLeave('${l.id}')">撤回</button>`:'-'}</td></tr>`).join('')
+        || '<tr><td colspan=4>暂无请假记录</td></tr>';
+  }
+  async function postLeave(){
+    if(!lReason.value){alert('请填写请假原因');return;}
+    await api('/api/student/leave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:lReason.value})});
+    lReason.value=''; alert('请假申请已提交，待老师审批'); load();
+  }
+  async function cancelLeave(id){ if(confirm('确定撤回该请假申请？')){ await api('/api/student/leaves/'+id,{method:'DELETE'}); load(); } }
+  async function changePwd(){
+    const r = await fetch('/api/change-password',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({oldPassword:oldPwd.value,newPassword:newPwd.value})});
+    const d = await r.json();
+    if(!r.ok){alert(d.error);return;}
+    oldPwd.value='';newPwd.value=''; alert('密码修改成功');
+  }
+  async function logout(){
+    await fetch('/api/logout',{method:'POST',headers:{'Authorization':'Bearer '+token}});
+    localStorage.clear(); location.href='login.html';
+  }
+  load();
+  setInterval(load, 10000);
+</script>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>学校管理系统 · 注册</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Microsoft YaHei", "PingFang SC", sans-serif; }
+  body { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+         background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%); padding: 20px; }
+  .card { background: #fff; width: 420px; border-radius: 16px; padding: 36px 32px;
+          box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+  h1 { text-align: center; color: #1e3a8a; font-size: 22px; margin-bottom: 6px; }
+  .sub { text-align: center; color: #888; font-size: 13px; margin-bottom: 22px; }
+  .roles { display: flex; gap: 8px; margin-bottom: 20px; }
+  .role-btn { flex: 1; padding: 10px 0; border: 2px solid #dcdfe6; border-radius: 8px;
+               background: #fff; color: #666; font-size: 14px; cursor: pointer; transition: all .2s; }
+  .role-btn.active { border-color: #2563eb; background: #eff6ff; color: #2563eb; font-weight: 600; }
+  label { display: block; font-size: 13px; color: #555; margin: 12px 0 5px; }
+  input, select { width: 100%; padding: 10px 12px; border: 1px solid #dcdfe6; border-radius: 8px;
+                  font-size: 14px; outline: none; }
+  input:focus, select:focus { border-color: #2563eb; }
+  .row { display: flex; gap: 10px; }
+  .row > div { flex: 1; }
+  button { width: 100%; margin-top: 22px; padding: 12px; background: #2563eb; color: #fff;
+           border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
+  button:hover { background: #1d4ed8; }
+  .err { color: #e53e3e; font-size: 13px; text-align: center; margin-top: 12px; min-height: 18px; }
+  .foot { text-align: center; margin-top: 16px; font-size: 13px; color: #888; }
+  .foot a { color: #2563eb; text-decoration: none; }
+  .hint { font-size: 12px; color: #999; margin-top: 4px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>注册账号</h1>
+    <div class="sub">请选择您的身份并填写信息</div>
+
+    <div class="roles">
+      <button class="role-btn active" data-role="teacher" onclick="selectRole('teacher')">教师</button>
+      <button class="role-btn" data-role="student" onclick="selectRole('student')">学生</button>
+      <button class="role-btn" data-role="parent" onclick="selectRole('parent')">家长</button>
+    </div>
+
+    <label>用户名</label>
+    <input id="username" placeholder="设置登录用户名（字母/数字）">
+
+    <div class="row">
+      <div>
+        <label>密码</label>
+        <input id="password" type="password" placeholder="至少4位">
+      </div>
+      <div>
+        <label>确认密码</label>
+        <input id="password2" type="password" placeholder="再次输入">
+      </div>
+    </div>
+
+    <label>姓名</label>
+    <input id="name" placeholder="真实姓名">
+
+    <!-- 教师字段 -->
+    <div id="field-teacher" class="role-field">
+      <label>任教学科</label>
+      <input id="subject" placeholder="如：数学、语文、英语">
+      <label>任教班级</label>
+      <input id="tClassName" placeholder="如：三年级1班">
+      <div class="hint">班级不存在将自动创建，并绑定您为该班老师</div>
+    </div>
+
+    <!-- 学生字段 -->
+    <div id="field-student" class="role-field" style="display:none;">
+      <div class="row">
+        <div>
+          <label>性别</label>
+          <select id="gender">
+            <option value="男">男</option>
+            <option value="女">女</option>
+          </select>
+        </div>
+        <div>
+          <label>学号（可选）</label>
+          <input id="studentNo" placeholder="不填自动生成">
+        </div>
+      </div>
+      <label>班级</label>
+      <input id="className" placeholder="如：三年级1班">
+      <div class="hint">班级不存在将自动创建</div>
+    </div>
+
+    <!-- 家长字段 -->
+    <div id="field-parent" class="role-field" style="display:none;">
+      <label>孩子姓名</label>
+      <select id="childName">
+        <option value="">请选择已注册的学生</option>
+      </select>
+      <div class="hint">如孩子尚未注册，请先让学生注册，或联系管理员添加</div>
+    </div>
+
+    <div class="err" id="err"></div>
+    <button onclick="doRegister()">注 册</button>
+    <div class="foot">已有账号？<a href="login.html">返回登录</a></div>
+  </div>
+
+<script>
+  let currentRole = 'teacher';
+
+  function selectRole(role) {
+    currentRole = role;
+    document.querySelectorAll('.role-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.role === role);
+    });
+    document.querySelectorAll('.role-field').forEach(f => f.style.display = 'none');
+    document.getElementById('field-' + role).style.display = 'block';
+    if (role === 'parent') loadStudents();
+  }
+
+  async function loadStudents() {
+    try {
+      const res = await fetch('/api/public/students');
+      const list = await res.json();
+      const sel = document.getElementById('childName');
+      sel.innerHTML = '<option value="">请选择已注册的学生</option>';
+      list.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.name;
+        opt.textContent = s.name + (s.className ? '（' + s.className + '）' : '');
+        sel.appendChild(opt);
+      });
+    } catch (e) {}
+  }
+
+  async function doRegister() {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    const password2 = document.getElementById('password2').value;
+    const name = document.getElementById('name').value.trim();
+    const err = document.getElementById('err');
+    err.textContent = '';
+
+    if (!username || !password || !name) { err.textContent = '请填写完整信息'; return; }
+    if (password !== password2) { err.textContent = '两次密码不一致'; return; }
+    if (password.length < 4) { err.textContent = '密码至少4位'; return; }
+
+    const body = { role: currentRole, username, password, name };
+
+    if (currentRole === 'teacher') {
+      body.subject = document.getElementById('subject').value.trim();
+      body.className = document.getElementById('tClassName').value.trim();
+      if (!body.className) { err.textContent = '请填写任教班级'; return; }
+    } else if (currentRole === 'student') {
+      body.gender = document.getElementById('gender').value;
+      body.className = document.getElementById('className').value.trim();
+      body.studentNo = document.getElementById('studentNo').value.trim();
+      if (!body.className) { err.textContent = '请填写班级'; return; }
+    } else if (currentRole === 'parent') {
+      body.childName = document.getElementById('childName').value;
+      if (!body.childName) { err.textContent = '请选择孩子'; return; }
+    }
+
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) { err.textContent = data.error || '注册失败'; return; }
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('role', data.role);
+      localStorage.setItem('name', data.name);
+      location.href = data.home;
+    } catch (e) { err.textContent = '网络错误，请重试'; }
+  }
+</script>
+</body>
+</html>

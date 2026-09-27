@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理员 · 后台</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:"Microsoft YaHei","PingFang SC",sans-serif; }
+  body { display:flex; min-height:100vh; background:#f1f5f9; }
+  .sidebar { width:220px; background:#0f172a; color:#cbd5e1; padding:24px 0; flex-shrink:0; }
+  .sidebar h2 { color:#fff; text-align:center; margin-bottom:24px; font-size:17px; }
+  .sidebar a { display:block; padding:11px 28px; color:#94a3b8; text-decoration:none; font-size:14px; cursor:pointer; }
+  .sidebar a:hover, .sidebar a.active { background:#1e293b; color:#fff; border-left:3px solid #3b82f6; }
+  .main { flex:1; padding:26px 32px; overflow-x:auto; }
+  .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:22px; }
+  .topbar h1 { font-size:20px; color:#1e293b; }
+  .logout { background:#ef4444; color:#fff; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; }
+  .cards { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:24px; }
+  .card { background:#fff; border-radius:10px; padding:18px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .card .num { font-size:28px; font-weight:bold; color:#1e40af; }
+  .card .label { color:#64748b; font-size:13px; margin-top:5px; }
+  .panel { background:#fff; border-radius:10px; padding:22px; box-shadow:0 1px 3px rgba(0,0,0,.08); margin-bottom:20px; display:none; }
+  .panel.active { display:block; }
+  .panel h3 { margin-bottom:16px; color:#1e293b; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th,td { padding:9px 11px; text-align:left; border-bottom:1px solid #e2e8f0; }
+  th { background:#f8fafc; color:#475569; }
+  .tag { padding:2px 8px; border-radius:10px; font-size:12px; }
+  .red { background:#fee2e2; color:#dc2626; }
+  .green { background:#dcfce7; color:#16a34a; }
+  .orange { background:#ffedd5; color:#ea580c; }
+  input,textarea,select { width:100%; padding:9px 11px; border:1px solid #dcdfe6; border-radius:6px; margin-bottom:10px; font-size:14px; }
+  .btn { background:#2563eb; color:#fff; border:none; padding:9px 18px; border-radius:6px; cursor:pointer; font-size:14px; }
+  .btn-sm { padding:5px 12px; font-size:13px; border-radius:5px; }
+  .btn-green { background:#16a34a; }
+  .btn-red { background:#ef4444; }
+  .btn-gray { background:#94a3b8; }
+  .form-row { display:flex; gap:10px; }
+  .form-row input { flex:1; }
+  .notice-item { padding:12px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:10px; }
+</style>
+</head>
+<body>
+  <div class="sidebar">
+    <h2>管理后台</h2>
+    <a class="active" data-tab="dash" onclick="show('dash',this)">数据看板</a>
+    <a data-tab="students" onclick="show('students',this)">学生管理</a>
+    <a data-tab="teachers" onclick="show('teachers',this)">教师管理</a>
+    <a data-tab="parents" onclick="show('parents',this)">家长管理</a>
+    <a data-tab="classes" onclick="show('classes',this)">班级管理</a>
+    <a data-tab="fees" onclick="show('fees',this)">收费管理</a>
+    <a data-tab="leaves" onclick="show('leaves',this)">请假审批</a>
+    <a data-tab="notice" onclick="show('notice',this)">发布通知</a>
+    <a data-tab="users" onclick="show('users',this)">用户管理</a>
+    <a data-tab="pwd" onclick="show('pwd',this)">修改密码</a>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <h1 id="greeting">欢迎，管理员</h1>
+      <button class="logout" onclick="logout()">退出登录</button>
+    </div>
+    <div class="cards">
+      <div class="card"><div class="num" id="c-stu">-</div><div class="label">在校学生</div></div>
+      <div class="card"><div class="num" id="c-tea">-</div><div class="label">教职工</div></div>
+      <div class="card"><div class="num" id="c-cls">-</div><div class="label">班级</div></div>
+      <div class="card"><div class="num" id="c-unpaid">-</div><div class="label">未缴费用</div></div>
+      <div class="card"><div class="num" id="c-leave">-</div><div class="label">待批请假</div></div>
+    </div>
+
+    <div class="panel active" id="p-dash">
+      <h3>最近通知</h3><div id="noticeList"></div>
+    </div>
+
+    <div class="panel" id="p-students">
+      <h3>添加学生</h3>
+      <div class="form-row">
+        <input id="sName" placeholder="姓名">
+        <select id="sGender"><option>男</option><option>女</option></select>
+        <input id="sNo" placeholder="学号（可空）">
+        <input id="sClass" placeholder="班级，如 三年级1班">
+        <button class="btn" onclick="addStudent()">添加</button>
+      </div>
+      <h3 style="margin-top:18px">学生名单</h3><table id="stuTable"></table>
+    </div>
+
+    <div class="panel" id="p-teachers">
+      <h3>教师名单</h3><table id="teaTable"></table>
+    </div>
+
+    <div class="panel" id="p-parents">
+      <h3>家长名单</h3><table id="parentTable"></table>
+    </div>
+
+    <div class="panel" id="p-classes">
+      <h3>创建班级</h3>
+      <div class="form-row">
+        <input id="cName" placeholder="班级名称，如 三年级1班">
+        <input id="cGrade" placeholder="年级，如 三年级">
+        <button class="btn" onclick="addClass()">创建</button>
+      </div>
+      <h3 style="margin-top:18px">班级列表</h3><table id="classTable"></table>
+    </div>
+
+    <div class="panel" id="p-fees">
+      <h3>添加收费项目</h3>
+      <div class="form-row">
+        <input id="fStudent" placeholder="学生姓名">
+        <input id="fItem" placeholder="项目，如 学费">
+        <input id="fAmount" type="number" placeholder="金额">
+        <button class="btn" onclick="addFee()">添加</button>
+      </div>
+      <h3 style="margin-top:18px">收费记录</h3><table id="feeTable"></table>
+    </div>
+
+    <div class="panel" id="p-leaves">
+      <h3>请假审批</h3><table id="leaveTable"></table>
+    </div>
+
+    <div class="panel" id="p-notice">
+      <h3>发布全校通知</h3>
+      <input id="nTitle" placeholder="通知标题">
+      <textarea id="nContent" rows="3" placeholder="通知内容"></textarea>
+      <button class="btn" onclick="postNotice()">发布</button>
+    </div>
+
+    <div class="panel" id="p-users">
+      <h3>所有用户</h3><table id="userTable"></table>
+    </div>
+
+    <div class="panel" id="p-pwd">
+      <h3>修改密码</h3>
+      <input id="oldPwd" type="password" placeholder="原密码">
+      <input id="newPwd" type="password" placeholder="新密码（至少4位）">
+      <button class="btn" onclick="changePwd()">确认修改</button>
+    </div>
+  </div>
+<script>
+  const token = localStorage.getItem('token');
+  if (!token || localStorage.getItem('role') !== 'admin') location.href = 'login.html';
+  const api = (p,opt={}) => fetch(p,{...opt,headers:{...(opt.headers||{}),'Authorization':'Bearer '+token}}).then(r=>r.json());
+  const jh = {method:'POST',headers:{'Content-Type':'application/json'}};
+
+  function show(tab, el){
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    document.getElementById('p-'+tab).classList.add('active');
+    document.querySelectorAll('.sidebar a').forEach(a=>a.classList.remove('active'));
+    el.classList.add('active');
+    load();
+  }
+  const className = id => (window._classes||[]).find(c=>c.id===id)?.name || '-';
+  const studentName = id => (window._students||[]).find(s=>s.id===id)?.name || id;
+
+  async function load(){
+    greeting.textContent = '欢迎，' + localStorage.getItem('name');
+    const stats = await api('/api/admin/stats');
+    document.getElementById('c-stu').textContent=stats.students;
+    document.getElementById('c-tea').textContent=stats.teachers;
+    document.getElementById('c-cls').textContent=stats.classes;
+    document.getElementById('c-unpaid').textContent=stats.unpaidFees;
+    document.getElementById('c-leave').textContent=stats.leaves;
+
+    window._students = await api('/api/admin/students');
+    window._classes = await api('/api/admin/classes');
+    const teas = await api('/api/admin/teachers');
+    const fees = await api('/api/admin/fees');
+    const notices = await api('/api/admin/notices');
+    const leaves = await api('/api/admin/leaves');
+    const users = await api('/api/admin/users');
+    const parents = await api('/api/admin/parents');
+
+    stuTable.innerHTML = '<tr><th>学号</th><th>姓名</th><th>性别</th><th>班级</th><th>操作</th></tr>' +
+      _students.map(s=>`<tr><td>${s.studentNo||'-'}</td><td>${s.name}</td><td>${s.gender||'-'}</td><td>${className(s.classId)}</td>
+        <td><button class="btn btn-sm btn-red" onclick="delStudent('${s.id}')">删除</button></td></tr>`).join('') || '<tr><td colspan=5>暂无学生</td></tr>';
+
+    teaTable.innerHTML = '<tr><th>姓名</th><th>科目</th><th>操作</th></tr>' +
+      teas.map(t=>`<tr><td>${t.name}</td><td>${t.subject||'-'}</td>
+        <td><button class="btn btn-sm btn-red" onclick="delTeacher('${t.id}')">删除</button></td></tr>`).join('') || '<tr><td colspan=3>暂无教师</td></tr>';
+
+    parentTable.innerHTML = '<tr><th>家长姓名</th><th>账号</th><th>关联孩子</th></tr>' +
+      parents.map(p=>`<tr><td>${p.name}</td><td>${p.username}</td><td>${p.childName}</td></tr>`).join('')
+      || '<tr><td colspan=3>暂无家长</td></tr>';
+
+    classTable.innerHTML = '<tr><th>班级名称</th><th>年级</th><th>人数</th><th>班主任</th><th>操作</th></tr>' +
+      _classes.map(c=>{
+        const topts = teas.map(t=>`<option value="${t.userId}" ${c.teacherId===t.userId?'selected':''}>${t.name}</option>`).join('');
+        return `<tr><td>${c.name}</td><td>${c.grade||'-'}</td><td>${_students.filter(s=>s.classId===c.id).length}</td>
+        <td><select style="width:auto;margin:0;padding:5px" onchange="assignTeacher('${c.id}',this.value)">
+          <option value="">未分配</option>${topts}</select></td>
+        <td><button class="btn btn-sm btn-red" onclick="delClass('${c.id}')">删除</button></td></tr>`;
+      }).join('') || '<tr><td colspan=5>暂无班级</td></tr>';
+
+    feeTable.innerHTML = '<tr><th>学生</th><th>项目</th><th>金额</th><th>状态</th><th>操作</th></tr>' +
+      fees.map(f=>`<tr><td>${studentName(f.studentId)}</td><td>${f.item}</td><td>¥${f.amount}</td>
+        <td><span class="tag ${f.paid?'green':'red'}">${f.paid?'已缴':'未缴'}</span></td>
+        <td><button class="btn btn-sm ${f.paid?'btn-gray':'btn-green'}" onclick="toggleFee('${f.id}',${!f.paid})">${f.paid?'标未缴':'标已缴'}</button></td></tr>`).join('')
+        || '<tr><td colspan=5>暂无记录</td></tr>';
+
+    leaveTable.innerHTML = '<tr><th>学生</th><th>原因</th><th>提交人</th><th>状态</th><th>操作</th></tr>' +
+      leaves.map(l=>`<tr><td>${l.studentName}</td><td>${l.reason||'-'}</td><td>${l.from==='家长'?'家长':'学生'}</td>
+        <td><span class="tag ${l.status==='待审批'?'orange':l.status==='批准'?'green':'red'}">${l.status}</span></td>
+        <td>${l.status==='待审批'?
+          `<button class="btn btn-sm btn-green" onclick="reviewLeave('${l.id}','批准')">批准</button>
+           <button class="btn btn-sm btn-red" onclick="reviewLeave('${l.id}','拒绝')">拒绝</button>`:'-'}</td></tr>`).join('')
+        || '<tr><td colspan=5>暂无请假</td></tr>';
+
+    userTable.innerHTML = '<tr><th>用户名</th><th>姓名</th><th>角色</th><th>操作</th></tr>' +
+      users.map(u=>`<tr><td>${u.username}</td><td>${u.name}</td><td>${ {admin:'管理员',teacher:'教师',student:'学生',parent:'家长'}[u.role] }</td>
+        <td>${u.role==='admin'?'-':`<button class="btn btn-sm btn-red" onclick="delUser('${u.id}')">删除</button>`}</td></tr>`).join('');
+
+    noticeList.innerHTML = notices.map(n=>`<div class="notice-item"><b>${n.title}</b>
+      <span style="color:#94a3b8;font-size:12px">（${n.date} · ${n.target}）</span>
+      <div style="color:#64748b;font-size:13px;margin:4px 0">${n.content}</div>
+      <button class="btn btn-sm btn-red" onclick="delNotice('${n.id}')">删除</button></div>`).join('') || '暂无通知';
+  }
+
+  async function addStudent(){
+    await api('/api/admin/students',{...jh,body:JSON.stringify({name:sName.value,gender:sGender.value,studentNo:sNo.value,classId:null,className:sClass.value})});
+    sName.value='';sNo.value='';sClass.value=''; alert('已添加'); load();
+  }
+  async function delStudent(id){ if(confirm('确定删除该学生？相关成绩考勤也会删除')){ await api('/api/admin/students/'+id,{method:'DELETE'}); load(); } }
+  async function delTeacher(id){ if(confirm('确定删除该教师？')){ await api('/api/admin/teachers/'+id,{method:'DELETE'}); load(); } }
+  async function addClass(){
+    await api('/api/admin/classes',{...jh,body:JSON.stringify({name:cName.value,grade:cGrade.value})});
+    cName.value='';cGrade.value=''; alert('已创建'); load();
+  }
+  async function delClass(id){ if(confirm('确定删除该班级？')){ await api('/api/admin/classes/'+id,{method:'DELETE'}); load(); } }
+  async function assignTeacher(id,teacherId){
+    await api('/api/admin/classes/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacherId})});
+    load();
+  }
+  async function addFee(){
+    const stu = _students.find(s=>s.name===fStudent.value);
+    await api('/api/admin/fees',{...jh,body:JSON.stringify({studentId:stu?stu.id:'',item:fItem.value,amount:+fAmount.value})});
+    fStudent.value='';fItem.value='';fAmount.value=''; alert('已添加'); load();
+  }
+  async function toggleFee(id,paid){ await api('/api/admin/fees/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({paid})}); load(); }
+  async function reviewLeave(id,status){ await api('/api/admin/leaves/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})}); load(); }
+  async function postNotice(){
+    await api('/api/admin/notices',{...jh,body:JSON.stringify({title:nTitle.value,content:nContent.value,target:'全校'})});
+    nTitle.value='';nContent.value=''; alert('已发布'); load();
+  }
+  async function delNotice(id){ if(confirm('确定删除该通知？')){ await api('/api/admin/notices/'+id,{method:'DELETE'}); load(); } }
+  async function delUser(id){ if(confirm('确定删除该用户？')){ await api('/api/admin/users/'+id,{method:'DELETE'}); load(); } }
+  async function changePwd(){
+    const r = await fetch('/api/change-password',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({oldPassword:oldPwd.value,newPassword:newPwd.value})});
+    const d = await r.json();
+    if(!r.ok){ alert(d.error); return; }
+    oldPwd.value='';newPwd.value=''; alert('密码修改成功');
+  }
+  async function logout(){
+    await fetch('/api/logout',{method:'POST',headers:{'Authorization':'Bearer '+token}});
+    localStorage.clear(); location.href='login.html';
+  }
+  load();
+  setInterval(load, 10000);
+</script>
+</body>
+</html>
